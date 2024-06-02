@@ -3,7 +3,7 @@ package io.github.spigotcvn.merger;
 import io.github.spigotcvn.merger.mappings.files.CSRGMappingFile;
 import io.github.spigotcvn.merger.mappings.files.TinyMappingFile;
 import io.github.spigotcvn.merger.mappings.types.Mapping;
-import javafx.util.Pair;
+import io.github.spigotcvn.merger.util.Pair;
 
 import java.util.List;
 import java.util.stream.Collectors;

@@ -2,7 +2,7 @@ package io.github.spigotcvn.merger.mappings.files;
 
 import io.github.spigotcvn.merger.mappings.InvalidMappingFormatException;
 import io.github.spigotcvn.merger.mappings.types.Mapping;
-import javafx.util.Pair;
+import io.github.spigotcvn.merger.util.Pair;
 
 import java.io.*;
 import java.util.*;
