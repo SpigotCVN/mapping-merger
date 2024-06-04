@@ -52,7 +52,12 @@ public class Mapping {
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, name, className, descriptor);
+        int hash = 17;
+        hash = 31 * hash + type.hashCode();
+        hash = 37 * hash + name.hashCode();
+        hash = 31 * hash + (className == null ? 0 : className.hashCode());
+        hash = 37 * hash + (descriptor == null ? 0 : descriptor.hashCode());
+        return hash;
     }
 
     @Override

@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '8.0.0+'
 }
 
@@ -12,8 +13,10 @@ repositories {
 }
 
 dependencies {
+    implementation 'com.google.guava:guava:30.1-jre'
     implementation 'net.sf.jopt-simple:jopt-simple:5.0.4'
-    implementation 'org.jetbrains:annotations:20.1.0'
+
+    compileOnly 'org.jetbrains:annotations:20.1.0'
 }
 
 jar {
@@ -23,5 +26,13 @@ jar {
         attributes(
                 'Main-Class': 'io.github.spigotcvn.merger.Main'
         )
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
     }
 }

@@ -2,7 +2,6 @@ package io.github.spigotcvn.merger.mappings.files;
 
 import io.github.spigotcvn.merger.mappings.InvalidMappingFormatException;
 import io.github.spigotcvn.merger.mappings.types.Mapping;
-import io.github.spigotcvn.merger.util.Pair;
 
 import java.io.*;
 import java.util.*;
@@ -11,13 +10,13 @@ import java.util.stream.Collectors;
 public class TinyMappingFile implements Loadable, Saveable {
     private String originalNamespace;
     // structure: Map (String namespace, List (Pair (Mapping from, Mapping to)))
-    private final Map<String, List<Pair<Mapping, Mapping>>> namespaces = new LinkedHashMap<>();
+    private final Map<String, Map<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
 
     public void addNamespace(String namespace) {
         if(namespace == null || namespaces.containsKey(namespace)) {
             throw new IllegalArgumentException("Invalid namespace: " + namespace);
         }
-        namespaces.put(namespace, new ArrayList<>());
+        namespaces.put(namespace, new LinkedHashMap<>());
     }
 
     public Mapping getMapping(String namespace, Mapping from) {
@@ -28,19 +27,11 @@ public class TinyMappingFile implements Loadable, Saveable {
         if(namespace.equals(originalNamespace)) {
             return from;
         }
-        List<Pair<Mapping, Mapping>> mappings = namespaces.get(namespace);
+        Map<Mapping, Mapping> mappings = namespaces.get(namespace);
         if(mappings == null) {
             throw new IllegalArgumentException("Unknown namespace: " + namespace);
         }
-        for (Pair<Mapping, Mapping> pair : mappings) {
-            if(pair == null) {
-                throw new IllegalStateException("Pair is null");
-            }
-            if(pair.getKey().equals(from)) {
-                return pair.getValue();
-            }
-        }
-        return null;
+        return mappings.get(from);
     }
 
     public Mapping getOriginal(String namespace, Mapping to) {
@@ -51,13 +42,13 @@ public class TinyMappingFile implements Loadable, Saveable {
         if(namespace.equals(originalNamespace)) {
             return to;
         }
-        List<Pair<Mapping, Mapping>> mappings = namespaces.get(namespace);
+        Map<Mapping, Mapping> mappings = namespaces.get(namespace);
         if(mappings == null) {
             throw new IllegalArgumentException("Unknown namespace: " + namespace);
         }
-        for (Pair<Mapping, Mapping> pair : mappings) {
-            if(pair.getValue().equals(to)) {
-                return pair.getKey();
+        for(Map.Entry<Mapping, Mapping> entry : mappings.entrySet()) {
+            if(entry.getValue().equals(to)) {
+                return entry.getKey();
             }
         }
         return null;
@@ -71,19 +62,18 @@ public class TinyMappingFile implements Loadable, Saveable {
         if(namespace.equals(originalNamespace)) {
             throw new IllegalArgumentException("Cannot add mapping to the original namespace: " + namespace);
         }
-        List<Pair<Mapping, Mapping>> mappings = namespaces.get(namespace);
+
+        Map<Mapping, Mapping> mappings = namespaces.get(namespace);
         if(mappings == null) {
             throw new IllegalArgumentException("Unknown namespace: " + namespace);
         }
-        mappings.add(new Pair<>(from, to));
+        mappings.put(from, to);
     }
 
     public List<Mapping> getOriginalMappings() {
         List<Mapping> mappings = new ArrayList<>();
-        List<Pair<Mapping, Mapping>> firstNamespaceMappings = namespaces.get(namespaces.keySet().iterator().next());
-        for (Pair<Mapping, Mapping> pair : firstNamespaceMappings) {
-            mappings.add(pair.getKey());
-        }
+        Map<Mapping, Mapping> firstNamespace = namespaces.get(namespaces.keySet().iterator().next());
+        firstNamespace.forEach((from, to) -> mappings.add(from));
         return mappings;
     }
 
@@ -101,24 +91,13 @@ public class TinyMappingFile implements Loadable, Saveable {
         }
 
         List<Mapping> mappings = new ArrayList<>();
-        List<Pair<Mapping, Mapping>> namespaceMappings = namespaces.get(namespace);
-        for (Pair<Mapping, Mapping> pair : namespaceMappings) {
-            mappings.add(pair.getValue());
-        }
+        Map<Mapping, Mapping> namespaceMappings = namespaces.get(namespace);
+        namespaceMappings.forEach((from, to) -> mappings.add(from));
         return mappings;
     }
 
     @Override
     public void loadFromStream(InputStream is) throws InvalidMappingFormatException {
-        // check if namespaces has any nulls
-        namespaces.values().forEach(mappings -> {
-            mappings.forEach(pair -> {
-                if(pair == null || pair.getKey() == null || pair.getValue() == null) {
-                    System.err.println("Has nulls: " + pair);
-                }
-            });
-        });
-
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             int lineCount = 0;
             String line;
@@ -230,9 +209,9 @@ public class TinyMappingFile implements Loadable, Saveable {
 
             // Cache namespace entry Lists
             List<String> namespaceKeys = new ArrayList<>(namespaces.keySet());
-            List<Pair<Mapping, Mapping>> firstNamespaceMappings = namespaces.get(namespaceKeys.get(0));
+            Map<Mapping, Mapping> firstNamespaceMappings = namespaces.get(namespaceKeys.get(0));
 
-            List<String> lines = firstNamespaceMappings.parallelStream()
+            List<String> lines = firstNamespaceMappings.entrySet().parallelStream()
                     .map(pair -> {
                         StringBuilder lineBuilder = new StringBuilder();
                         Mapping from = pair.getKey();
