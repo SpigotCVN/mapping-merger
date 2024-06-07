@@ -19,6 +19,13 @@ public class TinyMappingFile implements Loadable, Saveable {
         namespaces.put(namespace, new LinkedHashMap<>());
     }
 
+    public void removeNamespace(String namespace) {
+        if(namespace == null || !namespaces.containsKey(namespace)) {
+            throw new IllegalArgumentException("Invalid namespace: " + namespace);
+        }
+        namespaces.remove(namespace);
+    }
+
     public Mapping getMapping(String namespace, Mapping from) {
         if(namespace == null || from == null) {
             throw new IllegalArgumentException("Invalid arguments: " + namespace + ", " + from);
@@ -94,6 +101,25 @@ public class TinyMappingFile implements Loadable, Saveable {
         Map<Mapping, Mapping> namespaceMappings = namespaces.get(namespace);
         namespaceMappings.forEach((from, to) -> mappings.add(from));
         return mappings;
+    }
+
+    public Map<String, Map<Mapping, Mapping>> getNamespaces() {
+        // create a deep copy of the namespaces map
+        Map<String, Map<Mapping, Mapping>> copy = new LinkedHashMap<>();
+        for(Map.Entry<String, Map<Mapping, Mapping>> entry : namespaces.entrySet()) {
+            Map<Mapping, Mapping> mappings = new LinkedHashMap<>();
+            mappings.putAll(entry.getValue());
+            copy.put(entry.getKey(), mappings);
+        }
+        return copy;
+    }
+
+    public String getOriginalNamespaceName() {
+        return originalNamespace;
+    }
+
+    public void setOriginalNamespaceName(String originalNamespace) {
+        this.originalNamespace = originalNamespace;
     }
 
     @Override
