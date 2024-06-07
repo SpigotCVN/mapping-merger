@@ -145,38 +145,40 @@ public class TinyMappingFile implements Loadable, Saveable {
                     }
                 }
                 if(parts[0].equals("FIELD")) {
+                    // following format: FIELD className descriptor originalName otherName
                     for (int i = 3; i < parts.length - 1; i++) {
                         addMapping(
                                 namespaces.get(i - 3),
                                 new Mapping(
                                         Mapping.Type.FIELD,
-                                        parts[1],
                                         parts[3],
+                                        parts[1],
                                         parts[2]
                                 ),
                                 new Mapping(
                                         Mapping.Type.FIELD,
                                         parts[i + 1],
-                                        parts[3],
+                                        parts[1],
                                         parts[2]
                                 )
                         );
                     }
                 }
                 if(parts[0].equals("METHOD")) {
+                    // following format: METHOD className descriptor originalName otherName
                     for (int i = 3; i < parts.length - 1; i++) {
                         addMapping(
                                 namespaces.get(i - 3),
                                 new Mapping(
                                         Mapping.Type.METHOD,
-                                        parts[1],
                                         parts[3],
+                                        parts[1],
                                         parts[2]
                                 ),
                                 new Mapping(
                                         Mapping.Type.METHOD,
                                         parts[i + 1],
-                                        parts[3],
+                                        parts[1],
                                         parts[2]
                                 )
                         );
@@ -215,14 +217,14 @@ public class TinyMappingFile implements Loadable, Saveable {
                         StringBuilder lineBuilder = new StringBuilder();
                         Mapping from = pair.getKey();
 
-                        lineBuilder.append(from.getType().name()).append("\t")
-                                .append(from.getName());
-                        if (from.getDescriptor() != null) {
-                            lineBuilder.append("\t").append(from.getDescriptor());
-                        }
+                        lineBuilder.append(from.getType().name()).append("\t");
                         if (from.getClassName() != null) {
                             lineBuilder.append("\t").append(from.getClassName());
                         }
+                        if (from.getDescriptor() != null) {
+                            lineBuilder.append("\t").append(from.getDescriptor());
+                        }
+                        lineBuilder.append("\t").append(from.getName());
 
                         for (String namespace : namespaceKeys) {
                             Mapping to = getMapping(namespace, from);
