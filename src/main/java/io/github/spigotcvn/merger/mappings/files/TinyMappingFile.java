@@ -217,7 +217,7 @@ public class TinyMappingFile implements Loadable, Saveable {
                         StringBuilder lineBuilder = new StringBuilder();
                         Mapping from = pair.getKey();
 
-                        lineBuilder.append(from.getType().name()).append("\t");
+                        lineBuilder.append(from.getType().name());
                         if (from.getClassName() != null) {
                             lineBuilder.append("\t").append(from.getClassName());
                         }
