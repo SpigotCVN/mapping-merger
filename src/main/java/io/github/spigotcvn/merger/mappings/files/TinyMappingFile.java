@@ -1,5 +1,7 @@
 package io.github.spigotcvn.merger.mappings.files;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import io.github.spigotcvn.merger.mappings.InvalidMappingFormatException;
 import io.github.spigotcvn.merger.mappings.types.Mapping;
 
@@ -10,13 +12,13 @@ import java.util.stream.Collectors;
 public class TinyMappingFile implements Loadable, Saveable {
     private String originalNamespace;
     // structure: Map (String namespace, List (Pair (Mapping from, Mapping to)))
-    private final Map<String, Map<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
+    private final Map<String, BiMap<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
 
     public void addNamespace(String namespace) {
         if(namespace == null || namespaces.containsKey(namespace)) {
             throw new IllegalArgumentException("Invalid namespace: " + namespace);
         }
-        namespaces.put(namespace, new LinkedHashMap<>());
+        namespaces.put(namespace, HashBiMap.create());
     }
 
     public void removeNamespace(String namespace) {
@@ -41,6 +43,28 @@ public class TinyMappingFile implements Loadable, Saveable {
         return mappings.get(from);
     }
 
+    public Mapping getMappingFromNamespace(String fromNamespace, String namespace, Mapping fromMapping) {
+        // this needs to get the mappings original form and then get the mapping from the namespace
+        if(fromNamespace == null || namespace == null || fromMapping == null) {
+            throw new IllegalArgumentException("Invalid arguments: " + fromNamespace + ", " + namespace + ", " + fromMapping);
+        }
+
+        if(fromNamespace.equals(namespace)) {
+            return fromMapping;
+        }
+
+        if(fromNamespace.equals(originalNamespace)) {
+            return getMapping(namespace, fromMapping);
+        }
+
+        Mapping original = getOriginal(fromNamespace, fromMapping);
+        if(original == null) {
+            return null;
+        }
+
+        return getMapping(namespace, original);
+    }
+
     public Mapping getOriginal(String namespace, Mapping to) {
         if(namespace == null || to == null) {
             throw new IllegalArgumentException("Invalid arguments: " + namespace + ", " + to);
@@ -49,16 +73,12 @@ public class TinyMappingFile implements Loadable, Saveable {
         if(namespace.equals(originalNamespace)) {
             return to;
         }
-        Map<Mapping, Mapping> mappings = namespaces.get(namespace);
+
+        BiMap<Mapping, Mapping> mappings = namespaces.get(namespace);
         if(mappings == null) {
             throw new IllegalArgumentException("Unknown namespace: " + namespace);
         }
-        for(Map.Entry<Mapping, Mapping> entry : mappings.entrySet()) {
-            if(entry.getValue().equals(to)) {
-                return entry.getKey();
-            }
-        }
-        return null;
+        return mappings.inverse().get(to);
     }
 
     public void addMapping(String namespace, Mapping from, Mapping to) {
@@ -99,15 +119,15 @@ public class TinyMappingFile implements Loadable, Saveable {
 
         List<Mapping> mappings = new ArrayList<>();
         Map<Mapping, Mapping> namespaceMappings = namespaces.get(namespace);
-        namespaceMappings.forEach((from, to) -> mappings.add(from));
+        namespaceMappings.forEach((from, to) -> mappings.add(to));
         return mappings;
     }
 
     public Map<String, Map<Mapping, Mapping>> getNamespaces() {
         // create a deep copy of the namespaces map
         Map<String, Map<Mapping, Mapping>> copy = new LinkedHashMap<>();
-        for(Map.Entry<String, Map<Mapping, Mapping>> entry : namespaces.entrySet()) {
-            Map<Mapping, Mapping> mappings = new LinkedHashMap<>();
+        for(Map.Entry<String, BiMap<Mapping, Mapping>> entry : namespaces.entrySet()) {
+            BiMap<Mapping, Mapping> mappings = HashBiMap.create();
             mappings.putAll(entry.getValue());
             copy.put(entry.getKey(), mappings);
         }

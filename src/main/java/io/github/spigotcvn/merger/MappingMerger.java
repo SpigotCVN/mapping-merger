@@ -8,6 +8,7 @@ import io.github.spigotcvn.merger.util.Pair;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class MappingMerger {
@@ -85,21 +86,20 @@ public class MappingMerger {
     /**
      * Replaces the original namespace in the tiny mappings with another namespace.
      * Due to how the {@link TinyMappingFile} class is implemented, this is a bit more complex than just replacing the namespace.
-     * The original namespace doesn't exist as a seperate namespace, but only exists in every single stored
+     * The original namespace doesn't exist as a separate namespace, but only exists in every single stored
      * Map with mappings as the key.
      * This means that we have to go through every single mapping and replace the original namespace with the new namespace.
+     * Additionally, any references of classes in the class names or descriptors of the mappings will be replaced.
      * @param tiny The tiny mappings
      * @param namespaceReplacedBy The namespace that should replace the original namespace
      * @param newOriginalMappingName The name of the new original namespace
      */
     public static void replaceOriginalNamespace(TinyMappingFile tiny, String namespaceReplacedBy, String newOriginalMappingName) {
-        String originalNamespace = tiny.getOriginalNamespaceName();
-
         Map<String, Map<Mapping, Mapping>> namespaces = tiny.getNamespaces();
         Map<Mapping, Mapping> replaceBy = new LinkedHashMap<>();
         tiny.getOriginalMappings().forEach(mapping -> {
             Mapping remapped = tiny.getMapping(namespaceReplacedBy, mapping);
-            if(remapped == null) {
+            if (remapped == null) {
                 remapped = mapping;
             }
 
@@ -110,15 +110,19 @@ public class MappingMerger {
 
         Map<String, Map<Mapping, Mapping>> newNamespaces = new LinkedHashMap<>();
         namespaces.forEach((key, value) -> {
-            if(key.equals(namespaceReplacedBy)) {
+            if (key.equals(namespaceReplacedBy)) {
                 return;
             }
             Map<Mapping, Mapping> newMappings = new LinkedHashMap<>();
             value.forEach((originalMapping, remappedMapping) -> {
                 Mapping newRemapped = replaceBy.get(originalMapping);
-                if(newRemapped == null) {
+                if (newRemapped == null) {
                     newRemapped = remappedMapping;
                 }
+
+                // Replace class names and descriptors in the newRemapped mapping
+                newRemapped = replaceClassReferences(newRemapped, replaceBy);
+//                System.out.println(newRemapped.getClassName());
 
                 newMappings.put(newRemapped, remappedMapping);
             });
@@ -134,11 +138,101 @@ public class MappingMerger {
     }
 
     /**
+     * Replaces class references in the class names or descriptors of the mapping.
+     * @param mapping The mapping to replace class references in
+     * @param replaceBy The map of original mappings to their replacements
+     * @return The mapping with replaced class references
+     */
+    private static Mapping replaceClassReferences(Mapping mapping, Map<Mapping, Mapping> replaceBy) {
+        String className = mapping.getClassName();
+        String descriptor = mapping.getDescriptor();
+
+        if (className != null) {
+            Mapping remappedClassName = replaceBy.get(new Mapping(Mapping.Type.CLASS, className));
+            if (remappedClassName != null) {
+                className = remappedClassName.getName();
+            }
+        }
+
+        // Replace descriptor class names
+        if (descriptor != null) {
+//            System.out.println("Descriptor: " + descriptor);
+            descriptor = replaceClassNamesInDescriptor(descriptor, replaceBy);
+        }
+
+//        System.out.println("Original mapping: " + mapping);
+//        System.out.println("getClassName(): " + mapping.getClassName());
+//        System.out.println("Class name: " + className);
+//        System.out.println("Descriptor: " + descriptor);
+
+        return new Mapping(mapping.getType(), mapping.getName(), className, descriptor);
+    }
+
+    /**
+     * Replaces class names in a descriptor string using the provided map of replacements.
+     * @param descriptor The descriptor string to replace class names in
+     * @param replaceBy The map of original mappings to their replacements
+     * @return The descriptor string with replaced class names
+     */
+    private static String replaceClassNamesInDescriptor(String descriptor, Map<Mapping, Mapping> replaceBy) {
+        if (descriptor == null || descriptor.isEmpty()) {
+            return descriptor;
+        }
+
+        StringBuilder newDescriptor = new StringBuilder();
+        int length = descriptor.length();
+        for (int i = 0; i < length; i++) {
+            char c = descriptor.charAt(i);
+            if (c == 'L') {
+                int start = i;
+                int end = descriptor.indexOf(';', start);
+                if (end != -1) {
+                    String className = descriptor.substring(start + 1, end);
+                    Mapping remappedClassName = replaceBy.get(new Mapping(Mapping.Type.CLASS, className));
+                    if (remappedClassName != null) {
+                        className = remappedClassName.getName();
+                    }
+                    newDescriptor.append('L').append(className).append(';');
+                    i = end;
+                    continue;
+                }
+            }
+            newDescriptor.append(c);
+        }
+
+        return newDescriptor.toString();
+    }
+
+    /**
      * Calls {@link MappingMerger#replaceOriginalNamespace(TinyMappingFile, String, String)},
      * please see that method for more information.
      * @see MappingMerger#replaceOriginalNamespace(TinyMappingFile, String, String)
      */
     public static void replaceOriginalNamespace(TinyMappingFile tiny, String namespaceReplacedBy) {
         replaceOriginalNamespace(tiny, namespaceReplacedBy, namespaceReplacedBy);
+    }
+
+    public static CSRGMappingFile createCSRGfromTiny(TinyMappingFile tiny, String origNamespace, String remapNamespace) {
+        CSRGMappingFile csrg = new CSRGMappingFile();
+
+        List<Mapping> mappings = tiny.getMappings(origNamespace);
+        Map<String, Map<Mapping, Mapping>> namespaces = tiny.getNamespaces();
+
+        Map<Mapping, Mapping> mappingMap = mappings.parallelStream().map(mapping -> {
+            Mapping remapped = tiny.getMappingFromNamespace(origNamespace, remapNamespace, mapping);
+            if (remapped == null) {
+                remapped = mapping;
+            }
+
+            // replace the classname and descriptor to match the new original name (mapping)
+            Mapping newMapping = replaceClassReferences(mapping, namespaces.get(origNamespace));
+            remapped = replaceClassReferences(remapped, namespaces.get(origNamespace));
+
+            return new Pair<>(newMapping, remapped);
+        }).collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+
+        mappingMap.forEach(csrg::addMapping);
+
+        return csrg;
     }
 }
