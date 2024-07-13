@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 public class TinyMappingFile implements Loadable, Saveable {
     private String originalNamespace;
     // structure: Map (String namespace, List (Pair (Mapping from, Mapping to)))
-    private final Map<String, BiMap<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
+    private Map<String, BiMap<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
 
     public void addNamespace(String namespace) {
         if(namespace == null || namespaces.containsKey(namespace)) {
@@ -144,6 +144,7 @@ public class TinyMappingFile implements Loadable, Saveable {
 
     @Override
     public void loadFromStream(InputStream is) throws InvalidMappingFormatException {
+        namespaces.clear();
         try(BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             int lineCount = 0;
             String line;

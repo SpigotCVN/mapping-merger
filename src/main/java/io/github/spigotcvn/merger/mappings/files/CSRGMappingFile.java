@@ -2,11 +2,14 @@ package io.github.spigotcvn.merger.mappings.files;
 
 import io.github.spigotcvn.merger.mappings.InvalidMappingFormatException;
 import io.github.spigotcvn.merger.mappings.types.Mapping;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
-public class CSRGMappingFile implements Loadable, Saveable {
+public class CSRGMappingFile implements Loadable, Saveable, Iterable<Map.Entry<Mapping, Mapping>> {
     private final Map<Mapping, Mapping> orig2remap = new LinkedHashMap<>();
 
     public void addMapping(Mapping from, Mapping to) {
@@ -112,5 +115,15 @@ public class CSRGMappingFile implements Loadable, Saveable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    @NotNull
+    @Override
+    public Iterator<Map.Entry<Mapping, Mapping>> iterator() {
+        return orig2remap.entrySet().iterator();
+    }
+
+    public void forEach(BiConsumer<Mapping, Mapping> action) {
+        orig2remap.forEach(action);
     }
 }

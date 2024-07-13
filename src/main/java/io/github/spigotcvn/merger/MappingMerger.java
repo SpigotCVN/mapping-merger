@@ -8,7 +8,6 @@ import io.github.spigotcvn.merger.util.Pair;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 public class MappingMerger {
@@ -234,5 +233,53 @@ public class MappingMerger {
         mappingMap.forEach(csrg::addMapping);
 
         return csrg;
+    }
+
+    /**
+     * Applies a package mapping to the tiny file.
+     * Package mappings work in the following way:<p>
+     *     There is a csrg or srg file which contains class mappings which will be used as
+     *     package mappings.
+     *     E.g. if it contains "me/andreasmelone/ io/github/spigotcvn" it will change all classes
+     *     that use me/andreasmelone/ to use io/github/spigotcvn.
+     *     ./ will turn package-less classes to have packages
+     * @param toApplyTo The mapping file to apply the package mapping to
+     * @param packageMapping The package mapping itself
+     */
+    public static void applyPackageMapping(TinyMappingFile toApplyTo, CSRGMappingFile packageMapping) {
+        packageMapping.forEach((from, to) -> {
+            if(from.getType() != Mapping.Type.CLASS || to.getType() != Mapping.Type.CLASS) {
+                return;
+            }
+
+            String fromName = from.getName();
+            String toName = to.getName();
+
+            // csrg mapping is iterable, tiny mapping isn't
+            Map<String, Map<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
+            toApplyTo.getNamespaces().forEach((namespace, mappings) -> {
+                Map<Mapping, Mapping> newMapping = new LinkedHashMap<>();
+                mappings.forEach((original, remapped) -> {
+                    if(remapped.getClassName() != null) {
+                        String newClassName = remapped.getClassName();
+                        if(fromName.equals("./")) {
+                            newClassName = toName + "/" + newClassName;
+                        } else {
+                            newClassName = newClassName.replace(fromName, toName);
+                        }
+                        newMapping.put(original, new Mapping(remapped.getType(), remapped.getName(), newClassName, remapped.getDescriptor()));
+                    }
+                });
+                namespaces.put(namespace, newMapping);
+            });
+
+            namespaces.forEach((namespace, mappings) -> {
+                toApplyTo.removeNamespace(namespace);
+                toApplyTo.addNamespace(namespace);
+                mappings.forEach((original, remapped) -> {
+                    toApplyTo.addMapping(namespace, original, remapped);
+                });
+            });
+        });
     }
 }

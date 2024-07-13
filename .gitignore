@@ -43,5 +43,7 @@ bin/
 .DS_Store
 /oldsrc/
 
-mappings.csrg
-mappings.tiny
+*.csrg
+*.tiny
+*.jar
+oldStuff
