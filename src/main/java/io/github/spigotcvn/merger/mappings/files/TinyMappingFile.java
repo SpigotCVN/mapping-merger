@@ -276,7 +276,9 @@ public class TinyMappingFile implements Loadable, Saveable {
                         for (String namespace : namespaceKeys) {
                             Mapping to = getMapping(namespace, from);
                             if (to == null) {
-                                throw new IllegalStateException("Missing mapping for " + from + " in " + namespace);
+                                System.out.println("Missing mapping for " + from + " in " + namespace);
+                                continue;
+//                                throw new IllegalStateException("Missing mapping for " + from + " in " + namespace);
                             }
                             lineBuilder.append("\t").append(to.getName());
                         }

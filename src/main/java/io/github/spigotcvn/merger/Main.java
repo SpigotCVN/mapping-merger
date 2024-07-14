@@ -16,14 +16,15 @@ public class Main {
                 .describedAs("The mode to run the program in. Either MERGE_TINY, REPLACE_ORIGINAL, CREATE_CSRG_FROM_TINY");
         parser.accepts("from").withRequiredArg().ofType(File.class).required()
                 .describedAs("The csrg mapping that contains the mappings you want to merge into the to mapping.");
-        parser.accepts("to").withOptionalArg().ofType(File.class)
+        parser.accepts("to").withRequiredArg().ofType(File.class)
                 .describedAs("The tiny mapping that you want to merge the from mapping into.");
         parser.accepts("out").withRequiredArg().ofType(File.class).required()
                 .describedAs("The file to save the merged mappings to.");
-        parser.accepts("namespace").withRequiredArg().ofType(String.class).required()
+        parser.accepts("namespace").withRequiredArg().ofType(String.class)
                 .describedAs("The namespace to use for the merged mappings.");
-        parser.accepts("remap-namespace").withOptionalArg().ofType(String.class)
+        parser.accepts("remap-namespace").withRequiredArg().ofType(String.class)
                 .describedAs("Only available if CREATE_CSRG_FROM_TINY is selected. The namespace that will be used as the remapped one in the CSRG mappings.");
+        parser.allowsUnrecognizedOptions();
 
         OptionSet options = parser.parse(args);
         RunMode mode = (RunMode) options.valueOf("mode");
@@ -42,8 +43,6 @@ public class Main {
             fromFile.loadFromFile(from);
             TinyMappingFile toFile = new TinyMappingFile();
             toFile.loadFromFile(to);
-
-            System.out.println("gz: " + fromFile.getRemapped(new Mapping(Mapping.Type.CLASS, "gz")));
 
             System.out.println("Merging mappings " + from.getName() + " into " + to.getName() + ".");
             System.out.println("The process may take a while, please wait...");
@@ -108,6 +107,28 @@ public class Main {
 
             long startSave = System.currentTimeMillis();
             outMapping.saveToFile(out);
+            long endSave = System.currentTimeMillis();
+            System.out.println("Saving mappings took " + (endSave - startSave) + "ms.");
+            long end = System.currentTimeMillis();
+            System.out.println("The whole process took " + (end - start) + "ms.");
+        } else if(mode == RunMode.PACKAGE_MAPPINGS) {
+            if(to == null) {
+                throw new IllegalArgumentException("The to argument is required when running in PACKAGE_MAPPINGS mode.");
+            }
+
+            CSRGMappingFile fromFile = new CSRGMappingFile();
+            fromFile.loadFromFile(from);
+            TinyMappingFile toFile = new TinyMappingFile();
+            toFile.loadFromFile(to);
+
+            System.out.println("Applying package mappings to " + to.getName());
+            long start = System.currentTimeMillis();
+            long startApply = System.currentTimeMillis();
+            MappingMerger.applyPackageMapping(toFile, fromFile, false);
+            long endApply = System.currentTimeMillis();
+            System.out.println("Applying package mappings took " + (endApply - startApply) + "ms.");
+            long startSave = System.currentTimeMillis();
+            toFile.saveToFile(out);
             long endSave = System.currentTimeMillis();
             System.out.println("Saving mappings took " + (endSave - startSave) + "ms.");
             long end = System.currentTimeMillis();

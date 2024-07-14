@@ -245,8 +245,9 @@ public class MappingMerger {
      *     ./ will turn package-less classes to have packages
      * @param toApplyTo The mapping file to apply the package mapping to
      * @param packageMapping The package mapping itself
+     * @param repackageOriginal Whether to repackage the original namespace to the new package
      */
-    public static void applyPackageMapping(TinyMappingFile toApplyTo, CSRGMappingFile packageMapping) {
+    public static void applyPackageMapping(TinyMappingFile toApplyTo, CSRGMappingFile packageMapping, boolean repackageOriginal) {
         packageMapping.forEach((from, to) -> {
             if(from.getType() != Mapping.Type.CLASS || to.getType() != Mapping.Type.CLASS) {
                 return;
@@ -257,23 +258,48 @@ public class MappingMerger {
 
             // csrg mapping is iterable, tiny mapping isn't
             Map<String, Map<Mapping, Mapping>> namespaces = new LinkedHashMap<>();
+            Map<String, Map<Mapping, Mapping>> replaced = new LinkedHashMap<>();
+            replaced.put("original", new LinkedHashMap<>());
             toApplyTo.getNamespaces().forEach((namespace, mappings) -> {
                 Map<Mapping, Mapping> newMapping = new LinkedHashMap<>();
+                replaced.put(namespace, new LinkedHashMap<>());
                 mappings.forEach((original, remapped) -> {
-                    if(remapped.getClassName() != null) {
-                        String newClassName = remapped.getClassName();
-                        if(fromName.equals("./")) {
-                            newClassName = toName + "/" + newClassName;
-                        } else {
-                            newClassName = newClassName.replace(fromName, toName);
-                        }
-                        newMapping.put(original, new Mapping(remapped.getType(), remapped.getName(), newClassName, remapped.getDescriptor()));
+                    Mapping newOriginal = original;
+                    Mapping newRemapped = remapped;
+                    if(repackageOriginal) {
+                        newOriginal = replacePackage(original, fromName, toName);
                     }
+                    newRemapped = replacePackage(remapped, fromName, toName);
+
+                    if(original.getType() == Mapping.Type.CLASS) {
+                        replaced.get("original").put(original, newOriginal);
+                        replaced.get(namespace).put(remapped, newRemapped);
+                    }
+
+                    newMapping.put(newOriginal, newRemapped);
                 });
                 namespaces.put(namespace, newMapping);
             });
 
+            Map<String, Map<Mapping, Mapping>> newNamespaces = new LinkedHashMap<>();
             namespaces.forEach((namespace, mappings) -> {
+                Map<Mapping, Mapping> newMapping = new LinkedHashMap<>();
+                mappings.forEach((original, remapped) -> {
+                    // replace descriptors
+                    Mapping newOriginal = original;
+                    Mapping newRemapped = remapped;
+
+                    if(newOriginal.getDescriptor() != null) {
+                        newOriginal = new Mapping(newOriginal.getType(), newOriginal.getName(), newOriginal.getClassName(), replaceClassNamesInDescriptor(original.getDescriptor(), replaced.get("original")));
+                        newRemapped = new Mapping(newRemapped.getType(), newRemapped.getName(), newRemapped.getClassName(), replaceClassNamesInDescriptor(remapped.getDescriptor(), replaced.get(namespace)));
+                    }
+
+                    newMapping.put(newOriginal, newRemapped);
+                });
+                newNamespaces.put(namespace, newMapping);
+            });
+
+            newNamespaces.forEach((namespace, mappings) -> {
                 toApplyTo.removeNamespace(namespace);
                 toApplyTo.addNamespace(namespace);
                 mappings.forEach((original, remapped) -> {
@@ -281,5 +307,26 @@ public class MappingMerger {
                 });
             });
         });
+    }
+
+    private static Mapping replacePackage(Mapping original, String originalPackage, String newPackage) {
+        String newClassName = original.getType() == Mapping.Type.CLASS ? original.getName() : original.getClassName();
+        if(originalPackage.equals("./")) {
+            if(!newClassName.contains("/")) newClassName = newPackage + newClassName;
+        } else {
+            int lastSlashIndex = newClassName.lastIndexOf("/") + 1;
+            if(lastSlashIndex == 0) {
+                return original;
+            }
+            String packageName = newClassName.substring(0, lastSlashIndex);
+            if(packageName.equals(originalPackage)) {
+                newClassName = newPackage + newClassName.substring(lastSlashIndex);
+            }
+        }
+        if(original.getType() == Mapping.Type.CLASS) {
+            return new Mapping(original.getType(), newClassName);
+        } else {
+            return new Mapping(original.getType(), original.getName(), newClassName, original.getDescriptor());
+        }
     }
 }
