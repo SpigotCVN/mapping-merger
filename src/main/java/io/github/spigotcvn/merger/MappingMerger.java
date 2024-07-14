@@ -243,6 +243,7 @@ public class MappingMerger {
      *     E.g. if it contains "me/andreasmelone/ io/github/spigotcvn" it will change all classes
      *     that use me/andreasmelone/ to use io/github/spigotcvn.
      *     ./ will turn package-less classes to have packages
+     *     A package name that doesn't end in / is invalid and will never work
      * @param toApplyTo The mapping file to apply the package mapping to
      * @param packageMapping The package mapping itself
      * @param repackageOriginal Whether to repackage the original namespace to the new package
